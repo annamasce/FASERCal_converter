@@ -1,0 +1,3 @@
+[submodule "faser-common"]
+	path = faser-common
+	url = ssh://git@gitlab.cern.ch:7999/faser/faser-common.git
