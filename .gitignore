@@ -1,3 +1,5 @@
 *.root
 *.daq
+*.pdf
+notebooks/.ipynb_checkpoints/
 build/

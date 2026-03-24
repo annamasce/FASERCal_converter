@@ -26,27 +26,28 @@ struct FEBhit {
 };
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <binary-file> [n_max] [debug] [new_fw]\n";
+    if (argc < 3) {
+        std::cerr << "Usage: " << argv[0] << " <binary-file> <output-file> [n_max] [debug] [new_fw]\n";
         return 1;
     }
 
     const char* path = argv[1];
+    const char* path_output = argv[2];
 
     bool new_fw = true;
     bool debug = false;
     int n_max = -1;
 
-    if (argc > 2) {
-        std::string argv_2 = argv[2];
+    if (argc > 3) {
+        std::string argv_2 = argv[3];
         n_max = std::stoi(argv_2);
     }
-    if (argc > 3) {
-        std::string argv_3 = argv[3];
+    if (argc > 4) {
+        std::string argv_3 = argv[4];
         debug = (argv_3 == "true" || argv_3 == "1");
     }
-    if (argc > 4) {
-        std::string argv_4 = argv[4];
+    if (argc > 5) {
+        std::string argv_4 = argv[5];
         new_fw = (argv_4 == "true" || argv_4 == "1");
     }
 
@@ -64,8 +65,9 @@ int main(int argc, char** argv) {
     int glob_evt_counter = 0;
     int glob_hit_counter = 0;
     int glob_time_hit_counter = 0;
+    int glob_empty_packet_counter = 0;
 
-    TFile f("output.root", "RECREATE");
+    TFile f(path_output, "RECREATE");
     TTree tree("Events", "FASERCal events");
 
     // Define branches for TTree
@@ -89,6 +91,7 @@ int main(int argc, char** argv) {
     tree.Branch("bcid", &bcid);
     tree.Branch("event_nbr", &event_nbr);
     tree.Branch("event_nbr_extended", &event_nbr_extended);
+    tree.Branch("feb_id", &feb_id);
     tree.Branch("channel_id", &channel_id);
     tree.Branch("amplitude_lg", &amplitude_lg);
     tree.Branch("amplitude_hg", &amplitude_hg);
@@ -136,13 +139,17 @@ int main(int argc, char** argv) {
             bcid = ev.get_bcid();
             event_nbr_extended = ev.get_event_id_extended();
 
+            int n_feb_with_data = 0;
+
             for (size_t board_id = 0; board_id < OCBConfig::NUM_FEBS_PER_OCB; board_id++){
                 if (ev.isCorruptedFEB(board_id)) {
                     std::cout << "FEB " << board_id << " data packet is corrupted (missing header or trailer)." << std::endl;
                 }
                 if (ev.hasData(board_id)) {
+                    std::cout << "FEB " << board_id << " sent data." << std::endl;
 
                     auto feb_packet = ev[board_id];
+                    if (feb_packet.get_hit_amplitudes().size() > 0) n_feb_with_data++;
                     if (feb_packet.isCorrupted()) { // this should never happen if the FEB is different from nullptr because the check is also made at the OCB level
                         std::cout << "FEB " << board_id << " data packet is corrupted (missing header or trailer)." << std::endl; 
                     }
@@ -197,6 +204,10 @@ int main(int argc, char** argv) {
 
             tree.Fill();
 
+            if (n_feb_with_data == 0) {
+                glob_empty_packet_counter++;
+            }
+
             start_index = -1;
             is_open_packet = false;
             glob_evt_counter++;
@@ -208,6 +219,7 @@ int main(int argc, char** argv) {
         ++index;
     }
     std::cout << "Number of OCB packets: " << glob_evt_counter << std::endl;
+    std::cout << "Number of empty OCB packets: " << glob_empty_packet_counter << std::endl;
     std::cout << "Number of hits: " << glob_hit_counter << std::endl;
     std::cout << "Number of time hits: " << glob_time_hit_counter << std::endl;
 
