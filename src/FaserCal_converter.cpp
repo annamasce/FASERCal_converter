@@ -29,14 +29,13 @@ struct FEBhit {
 
 int main(int argc, char** argv) {
     if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <binary-file> <output-file> [n_max] [debug] [new_fw]\n";
+        std::cerr << "Usage: " << argv[0] << " <binary-file> <output-file> [n_max] [debug]\n";
         return 1;
     }
 
     const char* path = argv[1];
     const char* path_output = argv[2];
 
-    bool new_fw = true;
     bool debug = false;
     int n_max = -1;
 
@@ -47,10 +46,6 @@ int main(int argc, char** argv) {
     if (argc > 4) {
         std::string argv_3 = argv[4];
         debug = (argv_3 == "true" || argv_3 == "1");
-    }
-    if (argc > 5) {
-        std::string argv_4 = argv[5];
-        new_fw = (argv_4 == "true" || argv_4 == "1");
     }
 
     std::ifstream in(path, std::ios::binary);
@@ -136,9 +131,8 @@ int main(int argc, char** argv) {
                     }
                     if (ev.hasData(board_id)) {
 
-                        if (feb_packet.get_hit_amplitudes().size() > 0) n_feb_with_data++;
-
                         auto feb_packet = ev[board_id];
+                        if (feb_packet.get_hit_amplitudes().size() > 0) n_feb_with_data++;
                         if (feb_packet.isCorrupted()) { // this should never happen if the FEB is different from nullptr because the check is also made at the OCB level
                             std::cout << "FEB " << board_id << " data packet is corrupted (missing header or trailer)." << std::endl; 
                         }
@@ -194,15 +188,18 @@ int main(int argc, char** argv) {
                 if (n_feb_with_data == 0) {
                     glob_empty_packet_counter++;
                 }
+                glob_ocb_packet_counter++;
      
             } // OCB fragment
 
         } // loop over fragments in event
 
+        glob_evt_counter++;
+
         if (glob_evt_counter >= n_max && n_max > 0) {
             break;
         }
-        glob_evt_counter++;
+
     } // loop over events in file
     std::cout << "Number of events: " << glob_evt_counter << std::endl;
     std::cout << "Number of OCB packets: " << glob_ocb_packet_counter << std::endl;
