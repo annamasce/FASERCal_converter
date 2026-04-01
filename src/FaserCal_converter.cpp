@@ -59,6 +59,8 @@ int main(int argc, char** argv) {
     int glob_hit_counter = 0;
     int glob_time_hit_counter = 0;
     int glob_empty_packet_counter = 0;
+    int glob_invalid_event_counter = 0;
+    int glob_duplicate_data_counter = 0;
 
     TFile f(path_output, "RECREATE");
     TTree tree("Events", "FASERCal events");
@@ -101,12 +103,18 @@ int main(int argc, char** argv) {
         std::cout<<event<<std::endl;
         for(const auto &id :event.getFragmentIDs()) {
             const EventFragment* frag=event.find_fragment(id);
-            std::cout<<*frag<<std::endl;
+            // std::cout<<*frag<<std::endl;
 
             if((frag->source_id()&0xFFFF0000) == OCBSourceID) {
                 OCBDataPacket ev = OCBDataPacket(frag->payload<const uint32_t*>(), frag->payload_size(), debug);
-                std::cout<<"OCB data packet:"<<std::endl;
-                std::cout<<ev<<std::endl;
+                // std::cout << ev << std::endl;
+                // if (!ev.is_valid() ) {
+                //     std::cout << "###########################################################################\n";
+                //     OCBDataPacket ev_debug = OCBDataPacket(frag->payload<const uint32_t*>(), frag->payload_size(), true);
+                //     std::cout<<ev_debug<<std::endl;
+                //     std::cout << "###########################################################################\n";
+                // }
+                if (!ev.is_valid()) glob_invalid_event_counter++;
 
                 // Clear all vectors used to fill in the TTree
                 channel_id.clear();
@@ -124,6 +132,7 @@ int main(int argc, char** argv) {
                 event_nbr_extended = ev.get_event_id_extended();
 
                 int n_feb_with_data = 0;
+                bool has_duplicate_data = false;
 
                 for (size_t board_id = 0; board_id < OCBConfig::NUM_FEBS_PER_OCB; board_id++){
                     if (ev.isCorruptedFEB(board_id)) {
@@ -139,6 +148,14 @@ int main(int argc, char** argv) {
                         if (feb_packet.hasMissingGTS()) {
                             std::cout << "FEB " << board_id << " data packet has missing GTS header or trailer." << std::endl;
                         }
+
+                        // if (feb_packet.hasDuplicateData()) {
+                        //     std::cout << "###########################################################################\n";
+                        //     OCBDataPacket ev_debug_2 = OCBDataPacket(frag->payload<const uint32_t*>(), frag->payload_size(), true);
+                        //     std::cout<<ev_debug_2<<std::endl;
+                        //     std::cout << "###########################################################################\n";
+                        // }
+                        if (feb_packet.hasDuplicateData()) has_duplicate_data = true;
 
                         // Create one Hit struct for each fired channel
                         std::map<int, FEBhit> feb_hit_map;
@@ -189,6 +206,7 @@ int main(int argc, char** argv) {
                     glob_empty_packet_counter++;
                 }
                 glob_ocb_packet_counter++;
+                if (has_duplicate_data) glob_duplicate_data_counter++;
      
             } // OCB fragment
 
@@ -203,6 +221,8 @@ int main(int argc, char** argv) {
     } // loop over events in file
     std::cout << "Number of events: " << glob_evt_counter << std::endl;
     std::cout << "Number of OCB packets: " << glob_ocb_packet_counter << std::endl;
+    std::cout << "Number of invalid OCB events: " << glob_invalid_event_counter << std::endl;
+    std::cout << "Number of OCB events with duplicate data: " << glob_duplicate_data_counter << std::endl;
     std::cout << "Number of hits: " << glob_hit_counter << std::endl;
     std::cout << "Number of time hits: " << glob_time_hit_counter << std::endl;
 
